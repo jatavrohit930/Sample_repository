@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Real AI Copilot Chat</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 700px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      height: 90vh;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      text-align: center;
+      position: relative;
+    }
+
+    .chat-header h1 {
+      font-size: 1.6em;
+      margin-bottom: 5px;
+    }
+
+    .chat-header .subtitle {
+      font-size: 0.85em;
+      opacity: 0.9;
+    }
+
+    .status-indicator {
+      position: absolute;
+      top: 30px;
+      right: 25px;
+      width: 12px;
+      height: 12px;
+      background: #4caf50;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #4caf50;
+      animation: pulse-green 2s infinite;
+    }
+
+    @keyframes pulse-green {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+
+    .api-setup {
+      background: linear-gradient(135deg, #fff9e6 0%, #fffaed 100%);
+      padding: 20px;
+      border-bottom: 3px solid #ffd700;
+      animation: slide-down 0.5s ease;
+    }
+
+    @keyframes slide-down {
+      from { transform: translateY(-100%); }
+      to { transform: translateY(0); }
+    }
+
+    .api-setup h3 {
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    .api-setup input {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      font-size: 0.95em;
+    }
+
+    .api-setup button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1em;
+      transition: transform 0.2s;
+    }
+
+    .api-setup button:hover {
+      transform: scale(1.02);
+    }
+
+    .api-setup a {
+      display: block;
+      margin-top: 10px;
+      text-align: center;
+      color: #667eea;
+      text-decoration: none;
+      font-size: 0.9em;
+    }
+
+    .chat-box {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #f5f7fa;
+    }
+
+    .chat-box::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .chat-box::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .chat-box::-webkit-scrollbar-thumb {
+      background: #667eea;
+      border-radius: 10px;
+    }
+
+    .chat-message {
+      margin-bottom: 15px;
+      padding: 14px 18px;
+      border-radius: 18px;
+      max-width: 75%;
+      word-wrap: break-word;
+      line-height: 1.5;
+      animation: fadeIn 0.4s ease;
+      position: relative;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .user-message {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bot-message {
+      background: white;
+      color: #333;
+      border: 1px solid #e0e0e0;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .system-message {
+      background: #e8f5e9;
+      color: #2e7d32;
+      text-align: center;
+      margin: 15px auto;
+      max-width: 85%;
+      border: 1px solid #4caf50;
+    }
+
+    .error-message {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef5350;
+      text-align: center;
+      margin: 15px auto;
+      max-width: 85%;
+    }
+
+    .loading {
+      background: #e3f2fd;
+      color: #1976d2;
+      font-style: italic;
+      border-bottom-left-radius: 4px;
+    }
+
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    .chat-input-area {
+      display: flex;
+      align-items: center;
+      padding: 20px;
+      border-top: 2px solid #e0e0e0;
+      gap: 10px;
+      background: white;
+    }
+
+    #chat-input {
+      flex: 1;
+      padding: 14px 18px;
+      border-radius: 25px;
+      border: 2px solid #667eea;
+      font-size: 1em;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    #chat-input:focus {
+      border-color: #764ba2;
+    }
+
+    #send-btn {
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s;
+      font-size: 1em;
+    }
+
+    #send-btn:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    #send-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: scale(1);
+    }
+
+    .icon-button {
+      cursor: pointer;
+      font-size: 1.6em;
+      padding: 8px;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+
+    .icon-button:hover {
+      transform: scale(1.2);
+    }
+
+    pre {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+
+    code {
+      background: #f5f5f5;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .message-time {
+      font-size: 0.75em;
+      opacity: 0.7;
+      margin-top: 5px;
+    }
+    .fa-camera {
+      font-family: "Font Awesome 6 Free";
+      font-weight: 900;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h1>🤖 Real AI Copilot</h1>
+      <div class="subtitle">Powered by Google Gemini AI</div>
+      <span class="status-indicator" title="Connected"></span>
+    </div>
+    
+    <div class="api-setup" id="api-setup">
+      <h3>🔑 Setup Your AI</h3>
+      <input 
+        type="text" 
+        id="api-key-input" 
+        placeholder="AIzaSyCDwM7BFef31jLnRdTb9whdZspAiN_Sjw8" 
+      />
+      <button onclick="saveApiKey()">✓ Connect & Start Chatting</button>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank">
+        🔗 Get Free API Key from Google AI Studio
+      </a>
+    </div>
+
+    <div class="chat-box" id="chat-box">
+      <div class="chat-message system-message">
+        👋 <strong>Welcome to Real AI Chat!</strong><br>
+        <small>Enter your API key above to start chatting with real AI</small>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <input 
+        type="text" 
+        id="chat-input" 
+        placeholder="Type your message..." 
+        onkeypress="handleKeyPress(event)" 
+        disabled 
+      />
+      <button onclick="sendMessage()" id="send-btn" disabled>Send</button>
+      <label class="icon-button" title="Camera">
+      <i class=""></i>
+        <input type="file" accept="image/*" capture="environment" onchange="handleCameraUpload(event)" hidden />
+      </label>
+      <label class="icon-button" title="Upload Image">
+<i class="fa-solid fa-folder-open"></i>
+        <input type="file" accept="image/*" onchange="handleImageUpload(event)" hidden />
+      </label>
+      <label class="icon-button" title="Upload File">
+        <i class="fa-solid fa-file"></i>
+        <input type="file" onchange="handleFileUpload(event)" hidden />
+      </label>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:3000/api';
+    const SESSION_ID = 'session_' + Date.now();
+    let API_KEY = 'enter your api key here'; // Will be set by user
+
+    function saveApiKey() {
+      const key = document.getElementById('api-key-input').value.trim();
+      
+      if (!key) {
+        showError('Please enter an API key!');
+        return;
+      }
+
+      if (key.length < 30) {
+        showError('API key seems too short. Please check and try again.');
+        return;
+      }
+
+      API_KEY = key;
+      document.getElementById('api-setup').style.display = 'none';
+      document.getElementById('chat-input').disabled = false;
+      document.getElementById('send-btn').disabled = false;
+      
+      clearChat();
+      appendMessage('System', '✅ <strong>Connected!</strong> Your AI assistant is ready. Ask me anything!', 'system-message');
+      document.getElementById('chat-input').focus();
+    }
+
+    function clearChat() {
+      document.getElementById('chat-box').innerHTML = '';
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById("chat-input");
+      const message = input.value.trim();
+      
+      if (!message) return;
+      
+      if (!API_KEY) {
+        showError('Please enter your API key first!');
+        return;
+      }
+
+      appendMessage("You", message, 'user-message');
+      input.value = "";
+
+      const loadingId = appendMessage("AI", "Thinking", 'bot-message loading');
+      toggleInput(false);
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: message,
+            sessionId: SESSION_ID,
+            apiKey: API_KEY
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to get response');
+        }
+
+        removeMessage(loadingId);
+        appendMessage("AI", formatResponse(data.response), 'bot-message');
+
+      } catch (error) {
+        console.error('Error:', error);
+        removeMessage(loadingId);
+        
+        let errorMsg = '❌ <strong>Error:</strong> ';
+        if (error.message.includes('fetch')) {
+          errorMsg += 'Cannot connect to server. Make sure backend is running on port 3000.';
+        } else if (error.message.includes('API_KEY_INVALID')) {
+          errorMsg += 'Invalid API Key. Please check your key.';
+        } else {
+          errorMsg += error.message;
+        }
+        
+        appendMessage("System", errorMsg, 'error-message');
+      }
+
+      toggleInput(true);
+      document.getElementById('chat-input').focus();
+    }
+
+    function formatResponse(text) {
+      // Format code blocks
+      text = text.replace(/```(\w+)?\n([\s\S]+?)```/g, '<pre><code>$2</code></pre>');
+      // Format inline code
+      text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+      // Format bold
+      text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // Format line breaks
+      text = text.replace(/\n/g, '<br>');
+      
+      return text;
+    }
+
+    function appendMessage(sender, text, className = 'bot-message') {
+      const chatBox = document.getElementById("chat-box");
+      const msg = document.createElement("div");
+      msg.className = `chat-message ${className}`;
+      msg.id = 'msg-' + Date.now() + '-' + Math.random();
+      
+      const time = new Date().toLocaleTimeString('en-IN', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      if (sender === 'System') {
+        msg.innerHTML = text;
+      } else {
+        msg.innerHTML = `<strong>${sender}:</strong> ${text}<div class="message-time">${time}</div>`;
+      }
+      
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return msg.id;
+    }
+
+    function removeMessage(messageId) {
+      const msg = document.getElementById(messageId);
+      if (msg) msg.remove();
+    }
+
+    function toggleInput(enabled) {
+      document.getElementById('chat-input').disabled = !enabled;
+      document.getElementById('send-btn').disabled = !enabled;
+    }
+
+    function showError(message) {
+      appendMessage('System', `⚠️ ${message}`, 'error-message');
+    }
+
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const imgURL = URL.createObjectURL(file);
+        appendMessage("You", `<img src="${imgURL}" style="max-width: 250px; border-radius: 12px; margin-top: 8px;" />`, 'user-message');
+        appendMessage("AI", "📸 I can see you uploaded an image! While I can't analyze images in this version, feel free to describe it and I'll help you with any questions!", 'bot-message');
+      }
+      event.target.value = '';
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        appendMessage("You", `📁 <strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)`, 'user-message');
+        appendMessage("AI", "📄 File received! Please tell me what you'd like to know about it!", 'bot-message');
+      }
+      event.target.value = '';
+    }
+
+    function handleCameraUpload(event) {
+      handleImageUpload(event);
+    }
+  </script>
+</body>
+</html>
