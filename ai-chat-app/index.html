@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Real AI Copilot Chat</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     * {
       box-sizing: border-box;
@@ -261,14 +262,16 @@
 
     .icon-button {
       cursor: pointer;
-      font-size: 1.6em;
+      font-size: 1.3em;
       padding: 8px;
       transition: transform 0.2s;
       display: inline-block;
+      color: #667eea;
     }
 
     .icon-button:hover {
       transform: scale(1.2);
+      color: #764ba2;
     }
 
     pre {
@@ -292,27 +295,62 @@
       opacity: 0.7;
       margin-top: 5px;
     }
-    .fa-camera {
-      font-family: "Font Awesome 6 Free";
-      font-weight: 900;
-      color: #000;
+
+    .uploaded-image {
+      max-width: 250px;
+      border-radius: 12px;
+      margin-top: 8px;
+      display: block;
+    }
+
+    .image-preview {
+      position: relative;
+      display: inline-block;
+      margin-top: 8px;
+    }
+
+    .remove-image {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 25px;
+      height: 25px;
+      cursor: pointer;
+      font-size: 0.9em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .image-attached {
+      background: #e3f2fd;
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin: 10px 0;
+      display: inline-block;
+      font-size: 0.9em;
+      color: #1976d2;
     }
   </style>
 </head>
 <body>
   <div class="chat-container">
     <div class="chat-header">
-      <h1>🤖 Real AI Copilot</h1>
-      <div class="subtitle">Powered by Google Gemini AI</div>
+      <h1><i class="fa-solid fa-robot"></i> Real AI Copilot</h1>
+      <div class="subtitle">Powered by Google Gemini AI - Now with Image Analysis! 📸</div>
       <span class="status-indicator" title="Connected"></span>
     </div>
     
     <div class="api-setup" id="api-setup">
       <h3>🔑 Setup Your AI</h3>
       <input 
-        type="text" 
+        type="password" 
         id="api-key-input" 
-        placeholder="AIzaSyCDwM7BFef31jLnRdTb9whdZspAiN_Sjw8" 
+        placeholder="Enter your Google AI API Key" 
       />
       <button onclick="saveApiKey()">✓ Connect & Start Chatting</button>
       <a href="https://aistudio.google.com/app/apikey" target="_blank">
@@ -323,7 +361,7 @@
     <div class="chat-box" id="chat-box">
       <div class="chat-message system-message">
         👋 <strong>Welcome to Real AI Chat!</strong><br>
-        <small>Enter your API key above to start chatting with real AI</small>
+        <small>Enter your API key above to start chatting with real AI. You can now analyze images too! 📸</small>
       </div>
     </div>
 
@@ -331,30 +369,26 @@
       <input 
         type="text" 
         id="chat-input" 
-        placeholder="Type your message..." 
+        placeholder="Type your message or upload an image..." 
         onkeypress="handleKeyPress(event)" 
         disabled 
       />
       <button onclick="sendMessage()" id="send-btn" disabled>Send</button>
       <label class="icon-button" title="Camera">
-      <i class=""></i>
-        <input type="file" accept="image/*" capture="environment" onchange="handleCameraUpload(event)" hidden />
+        <i class="fa-solid fa-camera"></i>
+        <input type="file" accept="image/*" capture="environment" onchange="handleImageUpload(event)" hidden />
       </label>
       <label class="icon-button" title="Upload Image">
-<i class="fa-solid fa-folder-open"></i>
+        <i class="fa-solid fa-image"></i>
         <input type="file" accept="image/*" onchange="handleImageUpload(event)" hidden />
-      </label>
-      <label class="icon-button" title="Upload File">
-        <i class="fa-solid fa-file"></i>
-        <input type="file" onchange="handleFileUpload(event)" hidden />
       </label>
     </div>
   </div>
 
   <script>
-    const API_BASE_URL = 'http://localhost:3000/api';
     const SESSION_ID = 'session_' + Date.now();
-    let API_KEY = 'enter your api key here'; // Will be set by user
+    let API_KEY = null;
+    let currentImage = null; // Store current image for sending
 
     function saveApiKey() {
       const key = document.getElementById('api-key-input').value.trim();
@@ -375,7 +409,7 @@
       document.getElementById('send-btn').disabled = false;
       
       clearChat();
-      appendMessage('System', '✅ <strong>Connected!</strong> Your AI assistant is ready. Ask me anything!', 'system-message');
+      appendMessage('System', '✅ <strong>Connected!</strong> Your AI assistant is ready. Ask me anything or upload images for analysis!', 'system-message');
       document.getElementById('chat-input').focus();
     }
 
@@ -394,30 +428,45 @@
       const input = document.getElementById("chat-input");
       const message = input.value.trim();
       
-      if (!message) return;
+      if (!message && !currentImage) return;
       
       if (!API_KEY) {
         showError('Please enter your API key first!');
         return;
       }
 
-      appendMessage("You", message, 'user-message');
+      // Display user message with image if attached
+      let userMessageHTML = message || "Analyze this image";
+      if (currentImage) {
+        userMessageHTML += `<br><img src="${currentImage.dataUrl}" class="uploaded-image" />`;
+      }
+      appendMessage("You", userMessageHTML, 'user-message');
       input.value = "";
 
-      const loadingId = appendMessage("AI", "Thinking", 'bot-message loading');
+      const loadingId = appendMessage("AI", "Analyzing", 'bot-message loading');
       toggleInput(false);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/chat`, {
+        const requestBody = {
+          message: message || "What's in this image?",
+          sessionId: SESSION_ID,
+          apiKey: API_KEY
+        };
+
+        // Add image data if present
+        if (currentImage) {
+          requestBody.image = {
+            data: currentImage.base64,
+            mimeType: currentImage.mimeType
+          };
+        }
+
+        const response = await fetch('http://localhost:3000/api/chat', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            message: message,
-            sessionId: SESSION_ID,
-            apiKey: API_KEY
-          })
+          body: JSON.stringify(requestBody)
         });
 
         const data = await response.json();
@@ -429,15 +478,18 @@
         removeMessage(loadingId);
         appendMessage("AI", formatResponse(data.response), 'bot-message');
 
+        // Clear the current image after sending
+        currentImage = null;
+
       } catch (error) {
         console.error('Error:', error);
         removeMessage(loadingId);
         
         let errorMsg = '❌ <strong>Error:</strong> ';
-        if (error.message.includes('fetch')) {
-          errorMsg += 'Cannot connect to server. Make sure backend is running on port 3000.';
-        } else if (error.message.includes('API_KEY_INVALID')) {
-          errorMsg += 'Invalid API Key. Please check your key.';
+        if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+          errorMsg += 'Cannot connect to server. Make sure the backend is running on port 3000. Run: npm start';
+        } else if (error.message.includes('Invalid API Key')) {
+          errorMsg += 'Invalid API Key. Please check your key and try again.';
         } else {
           errorMsg += error.message;
         }
@@ -450,15 +502,10 @@
     }
 
     function formatResponse(text) {
-      // Format code blocks
       text = text.replace(/```(\w+)?\n([\s\S]+?)```/g, '<pre><code>$2</code></pre>');
-      // Format inline code
       text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-      // Format bold
       text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      // Format line breaks
       text = text.replace(/\n/g, '<br>');
-      
       return text;
     }
 
@@ -498,22 +545,45 @@
       appendMessage('System', `⚠️ ${message}`, 'error-message');
     }
 
-    function handleImageUpload(event) {
+    async function handleImageUpload(event) {
       const file = event.target.files[0];
-      if (file) {
-        const imgURL = URL.createObjectURL(file);
-        appendMessage("You", `<img src="${imgURL}" style="max-width: 250px; border-radius: 12px; margin-top: 8px;" />`, 'user-message');
-        appendMessage("AI", "📸 I can see you uploaded an image! While I can't analyze images in this version, feel free to describe it and I'll help you with any questions!", 'bot-message');
-      }
-      event.target.value = '';
-    }
+      if (!file) return;
 
-    function handleFileUpload(event) {
-      const file = event.target.files[0];
-      if (file) {
-        appendMessage("You", `📁 <strong>${file.name}</strong> (${(file.size/1024).toFixed(1)} KB)`, 'user-message');
-        appendMessage("AI", "📄 File received! Please tell me what you'd like to know about it!", 'bot-message');
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        showError('Please upload a valid image file!');
+        event.target.value = '';
+        return;
       }
+
+      // Check file size (max 4MB for Gemini API)
+      if (file.size > 4 * 1024 * 1024) {
+        showError('Image too large! Please upload an image smaller than 4MB.');
+        event.target.value = '';
+        return;
+      }
+
+      try {
+        // Convert image to base64
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const base64Data = e.target.result.split(',')[1]; // Remove data:image/...;base64, prefix
+          const dataUrl = e.target.result;
+          
+          currentImage = {
+            base64: base64Data,
+            dataUrl: dataUrl,
+            mimeType: file.type
+          };
+
+          // Show preview in input area
+          appendMessage('System', `📸 <strong>Image uploaded!</strong> "${file.name}" - Type your question about this image or just click Send.`, 'system-message');
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        showError('Failed to process image: ' + error.message);
+      }
+
       event.target.value = '';
     }
 
